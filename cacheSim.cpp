@@ -3,6 +3,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "cache.h"
+
 using std::FILE;
 using std::string;
 using std::cout;
@@ -60,6 +62,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Build Cache Manager Object
+	CacheManager cache_manager(MemCyc, BSize, WrAlloc,
+							   L1Size, L1Assoc, L1Cyc, 
+							   L2Size, L2Assoc, L2Cyc);
+
 	while (getline(file, line)) {
 
 		stringstream ss(line);
@@ -85,11 +92,22 @@ int main(int argc, char **argv) {
 		// DEBUG - remove this line
 		cout << " (dec) " << num << endl;
 
+		// Line marked as read - perform 'read' operation
+		if (operation == 'R') {
+			cache_manager.read(num);
+		} else if (operation == 'W') { // Line marked as read - perform 'read' operation
+			cache_manager.write(num);
+		} else {
+			cerr << "Could not understand operation " << operation << endl;
+		}
+
 	}
 
 	double L1MissRate;
 	double L2MissRate;
 	double avgAccTime;
+
+	cache_manager.calc_stats(L1MissRate, L2MissRate, avgAccTime);
 
 	printf("L1miss=%.03f ", L1MissRate);
 	printf("L2miss=%.03f ", L2MissRate);
