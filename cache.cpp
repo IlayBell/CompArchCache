@@ -59,6 +59,8 @@ CacheLevel::CacheLevel(int cache_size, int block_size, int ways_num, int access_
     } 
 }
 
+
+
 Set::Set(int ways_num, int set_num) : ways(ways_num) {
     this->ways_num = ways_num;
     this->set_num = set_num;
@@ -184,6 +186,10 @@ void L2::evac_block(Block& block, int set_num, CacheManager* cache_manager) {
         l1_block->set_valid(false);
     }
 
+}
+
+void Set::set_set_num(int i) {
+    this->set_num = i;
 }
 
 Block* CacheLevel::get_block_in_set(int set_num, uint64_t tag) {
