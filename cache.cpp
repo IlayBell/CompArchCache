@@ -290,7 +290,7 @@ bool CacheLevel::is_exist_in_set(uint64_t set, uint64_t tag) {
 }
 
 void CacheManager::write(uint64_t addr) {
-    addr >>= log2(this->block_size);
+    addr >>= log2(this->block_size) + 2;
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
