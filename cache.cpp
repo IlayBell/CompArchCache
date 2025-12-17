@@ -159,6 +159,10 @@ void CacheLevel::propogate_block(uint64_t set,
                              uint64_t tag,
                              uint64_t addr_aligned,
                              CacheManager* cache_manager) {
+
+    set = addr_aligned & ((1ULL << this->set_num_bits()) - 1);
+    tag = addr_aligned >> this->set_num_bits();
+
     Set& curr_set = this->sets.at(set);
     Block* empty_block = curr_set.get_available_block();
 
