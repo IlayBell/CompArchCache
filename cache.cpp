@@ -109,7 +109,7 @@ void Block::fill(uint64_t tag, uint64_t addr_aligned) {
 }
 
 void CacheManager::read(uint64_t addr) {
-    addr >>= ALIGNMENT_OFFSET;
+    addr >>= log2(this->block_size);
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
@@ -290,7 +290,7 @@ bool CacheLevel::is_exist_in_set(uint64_t set, uint64_t tag) {
 }
 
 void CacheManager::write(uint64_t addr) {
-    addr >>= ALIGNMENT_OFFSET;
+    addr >>= log2(this->block_size);
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
