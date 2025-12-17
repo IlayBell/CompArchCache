@@ -1,20 +1,18 @@
 #include "cache.h"
 
-int pow(int base, int exp) {
-    if (exp == 0) {
-        return 1;
-    }
-
-    return base * pow(base, exp-1);
+int pow2(int exp) {
+    return 1 << exp;
 }
 
-int log2(int a) {
-    if (a == 1) {
-        return 0;
+int log2(int x) {
+    int res = 0;
+    while (x >>= 1) {
+        res++;
     }
 
-    return log2(a / 2) + 1;
+    return res;
 }
+
 
 CacheManager::CacheManager(int mem_cycle, 
                            int block_size_log,
@@ -26,19 +24,19 @@ CacheManager::CacheManager(int mem_cycle,
                            int l2_ways_log, 
                            int l2_access_time) : 
 
-                           l1(pow(2, l1_size_log),
-                           pow(2, block_size_log),
-                           pow(2, l1_ways_log),
+                           l1(pow2(l1_size_log),
+                           pow2(block_size_log),
+                           pow2(l1_ways_log),
                            l1_access_time), 
 
-                           l2(pow(2, l2_size_log),
-                           pow(2, block_size_log),
-                           pow(2, l2_ways_log),
+                           l2(pow2(l2_size_log),
+                           pow2(block_size_log),
+                           pow2(l2_ways_log),
                            l2_access_time) {
 
     this->mem_cycle = mem_cycle;
     this->is_write_allocate = is_write_allocate;
-    this->block_size = pow(2, block_size_log);
+    this->block_size = pow2(block_size_log);
     
 }
 
@@ -71,6 +69,7 @@ Block::Block() {
     this->dirty = false;
     this->tag = 0;
     this->LRU_order = 0;
+    this->addr_aligned = 0;
 }
 
 bool Block::get_valid() {
@@ -93,11 +92,20 @@ bool Block::compare_tag(uint64_t other) {
     return this->tag == other;
 }
 
-void Block::fill(uint64_t tag) {
+uint64_t Block::get_addr_aligned() {
+    return this->addr_aligned;
+}
+
+void Block::set_addr_aligned(uint64_t addr_aligned) {
+    this->addr_aligned = addr_aligned;
+}
+
+void Block::fill(uint64_t tag, uint64_t addr_aligned) {
     this->tag = tag;
     this->valid = true;
     this->dirty = false;
     this->LRU_order = 0; 
+    this->addr_aligned = addr_aligned;
 }
 
 void CacheManager::read(uint64_t addr) {
@@ -122,16 +130,17 @@ void CacheManager::read(uint64_t addr) {
         } else {
             this->l2.add_miss();
 
-            this->l2.propogate_block(set2, tag2, this);
+            this->l2.propogate_block(set2, tag2, addr, this);
         }
 
-        this->l1.propogate_block(set1, tag1, this);
+        this->l1.propogate_block(set1, tag1, addr, this);
     }
 
 }
 
 void CacheLevel::propogate_block(uint64_t set,
                              uint64_t tag,
+                             uint64_t addr_aligned,
                              CacheManager* cache_manager) {
     Set& curr_set = this->sets.at(set);
     Block* empty_block = curr_set.get_available_block();
@@ -140,33 +149,38 @@ void CacheLevel::propogate_block(uint64_t set,
         empty_block = curr_set.release(this, cache_manager);
     }
 
-    empty_block->fill(tag);
+    empty_block->fill(tag, addr_aligned);
     this->update_LRU(set, tag);
 }
 
 Block* Set::release(CacheLevel* cache, CacheManager* cache_manager) {
     Block& lru_block = this->get_LRU_block();
-    cache->evac_block(lru_block, this->set_num, cache_manager);
+    cache->evac_block(lru_block, cache_manager);
 
     return &lru_block;
 }
 
 Block& Set::get_LRU_block() {
-    Block& max_block = this->ways.at(0);
+    Block* max_block = &this->ways.at(0);
 
     for (int i = 1; i < this->ways_num; i++) {
-        Block& curr_block = this->ways.at(i);
+        Block* curr_block = &this->ways.at(i);
 
-        if(max_block.get_LRU_order() < curr_block.get_LRU_order()) {
+        if(max_block->get_LRU_order() < curr_block->get_LRU_order()) {
             max_block = curr_block;
         }
     }
 
-    return max_block;
+    return *max_block;
 }
 
-void L1::evac_block(Block& block, int set_num,  CacheManager* cache_manager) {
-    Block* l2_block = cache_manager->l2.get_block_in_set(set_num,
+void L1::evac_block(Block& block, CacheManager* cache_manager) {
+    uint64_t set2 = 0;
+    uint64_t tag2 = 0;
+
+    extract_bits(block.get_addr_aligned(), cache_manager->l2.set_num_bits(), set2, tag2);
+
+    Block* l2_block = cache_manager->l2.get_block_in_set(set2,
                                                          block.get_tag());
 
     if (l2_block) {
@@ -176,10 +190,15 @@ void L1::evac_block(Block& block, int set_num,  CacheManager* cache_manager) {
     block.set_valid(false);
 }
 
-void L2::evac_block(Block& block, int set_num, CacheManager* cache_manager) {
+void L2::evac_block(Block& block, CacheManager* cache_manager) {
     block.set_valid(false);
 
-    Block* l1_block = cache_manager->l1.get_block_in_set(set_num,
+    uint64_t set1 = 0;
+    uint64_t tag1 = 0;
+
+    extract_bits(block.get_addr_aligned(), cache_manager->l1.set_num_bits(), set1, tag1);
+
+    Block* l1_block = cache_manager->l1.get_block_in_set(set1,
                                                          block.get_tag());
 
     if (l1_block) {
@@ -201,7 +220,7 @@ Block* CacheLevel::get_block_in_set(int set_num, uint64_t tag) {
 Block* Set::get_block_by_tag(uint64_t tag) {
     for (int i = 0; i < this->ways_num; i++) {
         Block& curr_block = this->ways.at(i);
-        if (curr_block.compare_tag(tag)) {
+        if (curr_block.get_valid() && curr_block.compare_tag(tag)) {
             return &curr_block;
         }
     }
@@ -236,10 +255,12 @@ void CacheLevel::update_LRU(uint64_t set, uint64_t tag) {
     Set& curr_set = this->sets.at(set);
     for (int i = 0; i < this->ways_num; i++) {
         Block& curr_block = curr_set.get_block_at_idx(i);
-        if (curr_block.compare_tag(tag)) {
-            curr_block.set_LRU_order(0);
-        } else {
-            curr_block.set_LRU_order(curr_block.get_LRU_order() + 1);
+        if (curr_block.get_valid()) {
+            if (curr_block.compare_tag(tag)) {
+                curr_block.set_LRU_order(0);
+            } else {
+                curr_block.set_LRU_order(curr_block.get_LRU_order() + 1);
+            }
         }
     }
 }
@@ -260,7 +281,7 @@ bool CacheLevel::is_exist_in_set(uint64_t set, uint64_t tag) {
     Set& curr_set = this->sets.at(set);
     for (int i = 0; i < this->ways_num; i++) {
         Block& curr_block = curr_set.get_block_at_idx(i);
-        if (curr_block.compare_tag(tag)) {
+        if (curr_block.get_valid() && curr_block.compare_tag(tag)) {
             return true;
         }
     }
@@ -288,7 +309,7 @@ void CacheManager::write(uint64_t addr) {
         this->l2.add_access();
         if (this->l2.is_exist_in_set(set2, tag2)) {
             if(this->is_write_allocate) {
-                this->l1.propogate_block(set1, tag1, this);
+                this->l1.propogate_block(set1, tag1, addr, this);
                 this->l1.write_data(set1, tag1);
                 this->l1.update_LRU(set1, tag1);
             } else {
@@ -301,10 +322,10 @@ void CacheManager::write(uint64_t addr) {
             this->l2.add_miss();
 
             if(this->is_write_allocate) {
-                this->l2.propogate_block(set2, tag2, this);
+                this->l2.propogate_block(set2, tag2, addr, this);
                 this->l2.update_LRU(set2, tag2);
 
-                this->l1.propogate_block(set1, tag1, this);
+                this->l1.propogate_block(set1, tag1, addr, this);
                 this->l1.write_data(set1, tag1);
                 this->l1.update_LRU(set1, tag1);
             }

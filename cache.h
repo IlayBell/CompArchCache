@@ -20,6 +20,7 @@ class Block {
     bool dirty;
     uint64_t tag;
     int LRU_order;
+    uint64_t addr_aligned;
 
     public:
         Block();
@@ -31,8 +32,10 @@ class Block {
         bool compare_tag(uint64_t other);
         void set_LRU_order(int order);
         int get_LRU_order();
-        void fill(uint64_t tag);
+        void fill(uint64_t tag, uint64_t addr_aligned);
         uint64_t get_tag();
+        uint64_t get_addr_aligned();
+        void set_addr_aligned(uint64_t addr_aligned);
 };
 
 class Set {
@@ -74,7 +77,7 @@ class CacheLevel {
         void add_miss();
         void update_LRU(uint64_t set, uint64_t tag);
         void write_data(uint64_t set, uint64_t tag);
-        void propogate_block(uint64_t set, uint64_t tag, CacheManager* cache_manager);
+        void propogate_block(uint64_t set, uint64_t tag, uint64_t addr_aligned, CacheManager* cache_manager);
         Block* get_block_in_set(int set_num, uint64_t tag);
 
         int get_miss();
@@ -82,7 +85,7 @@ class CacheLevel {
         double calc_miss_rate();
         int get_access_time();
 
-        virtual void evac_block(Block& block, int set_num,  CacheManager* cache_manager) = 0;
+        virtual void evac_block(Block& block, CacheManager* cache_manager) = 0;
 
         virtual ~CacheLevel() = default;
 };
@@ -90,13 +93,13 @@ class CacheLevel {
 class L1 : public CacheLevel {
     public:
         L1(int cache_size, int block_size, int ways_num, int access_time);
-        void evac_block(Block& block, int set_num, CacheManager* cache_manager);
+        void evac_block(Block& block, CacheManager* cache_manager);
 };
 
 class L2 : public CacheLevel {
     public:
         L2(int cache_size, int block_size, int ways_num, int access_time);
-        void evac_block(Block& block, int set_num, CacheManager* cache_manager);
+        void evac_block(Block& block, CacheManager* cache_manager);
 };
 
 struct CacheManager {
