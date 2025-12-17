@@ -27,12 +27,12 @@ CacheManager::CacheManager(int mem_cycle,
                            int l2_access_time) : 
 
                            l1(pow(2, l1_size_log),
-                           pow(2, block_size),
+                           pow(2, block_size_log),
                            pow(2, l1_ways_log),
                            l1_access_time), 
 
                            l2(pow(2, l2_size_log),
-                           pow(2, block_size),
+                           pow(2, block_size_log),
                            pow(2, l2_ways_log),
                            l2_access_time) {
 
