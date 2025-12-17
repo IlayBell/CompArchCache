@@ -1,4 +1,5 @@
 #include "cache.h"
+#include <iostream>
 
 int pow2(int exp) {
     return 1 << exp;
@@ -134,6 +135,14 @@ void CacheManager::read(uint64_t addr) {
         }
 
         this->l1.propogate_block(set1, tag1, addr, this);
+        
+        Block* new_l1_block = this->l1.get_block_in_set(set1, tag1);
+        Block* new_l2_block = this->l2.get_block_in_set(set2, tag2);
+        if (new_l1_block && new_l2_block) {
+            new_l1_block->set_dirty(new_l2_block->get_dirty());
+        } else {
+            std::cout << "hamatzav bakantim!!" << std::endl;
+        }
     }
 
 }
