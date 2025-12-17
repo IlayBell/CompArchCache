@@ -93,9 +93,9 @@ int main(int argc, char **argv) {
 		cout << " (dec) " << num << endl;
 
 		// Line marked as read - perform 'read' operation
-		if (operation == 'R') {
+		if (operation == 'r') {
 			cache_manager.read(num);
-		} else if (operation == 'W') { // Line marked as read - perform 'read' operation
+		} else if (operation == 'w') { // Line marked as read - perform 'read' operation
 			cache_manager.write(num);
 		} else {
 			cerr << "Could not understand operation " << operation << endl;
