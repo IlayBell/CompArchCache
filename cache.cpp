@@ -111,7 +111,7 @@ void Block::fill(uint64_t tag, uint64_t addr_aligned) {
 
 void CacheManager::read(uint64_t addr) {
     addr >>= log2(this->block_size);
-    /*
+    
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
@@ -120,16 +120,16 @@ void CacheManager::read(uint64_t addr) {
     
     extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
     extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
-    */
-   // Correct L1/L2 set and tag calculation
-    uint64_t set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
-    uint64_t tag1 = addr >> this->l1.set_num_bits();
-
-    uint64_t set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
-    uint64_t tag2 = addr >> this->l2.set_num_bits(); // <- this must use l2.set_num_bits()
+   
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
         this->l1.update_LRU(set1, tag1);
+        
+        // ✅ FIX: inclusive cache → L2 was also accessed
+        if (this->l2.is_exist_in_set(set2, tag2)) {
+            this->l2.update_LRU(set2, tag2);
+        }
+
     } else {
         this->l1.add_miss();
 
@@ -159,10 +159,7 @@ void CacheLevel::propogate_block(uint64_t set,
                              uint64_t tag,
                              uint64_t addr_aligned,
                              CacheManager* cache_manager) {
-
-    set = addr_aligned & ((1ULL << this->set_num_bits()) - 1);
-    tag = addr_aligned >> this->set_num_bits();
-
+                                
     Set& curr_set = this->sets.at(set);
     Block* empty_block = curr_set.get_available_block();
 
@@ -205,6 +202,9 @@ void L1::evac_block(Block& block, CacheManager* cache_manager) {
 
     if (l2_block) {
         l2_block->set_dirty(block.get_dirty());
+        
+        // ✅ FIX: eviction implies recent use
+        cache_manager->l2.update_LRU(set2, tag2);
     } 
 
     block.set_valid(false);
