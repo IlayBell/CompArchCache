@@ -109,7 +109,7 @@ void Block::fill(uint64_t tag, uint64_t addr_aligned) {
 }
 
 void CacheManager::read(uint64_t addr) {
-    addr >>= log2(this->block_size);
+    addr >>= log2(this->block_size) + 2;
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
