@@ -198,8 +198,7 @@ void L2::evac_block(Block& block, CacheManager* cache_manager) {
 
     extract_bits(block.get_addr_aligned(), cache_manager->l1.set_num_bits(), set1, tag1);
 
-    Block* l1_block = cache_manager->l1.get_block_in_set(set1,
-                                                         block.get_tag());
+    Block* l1_block = cache_manager->l1.get_block_in_set(set1, tag1);
 
     if (l1_block) {
         l1_block->set_valid(false);
