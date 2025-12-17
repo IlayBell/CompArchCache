@@ -116,8 +116,16 @@ void CacheManager::read(uint64_t addr) {
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
 
+    /*
     extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
     extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
+    */
+   // Correct L1/L2 set and tag calculation
+    set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
+    tag1 = addr >> this->l1.set_num_bits();
+
+    set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
+    tag2 = addr >> this->l2.set_num_bits();
 
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
@@ -303,8 +311,17 @@ void CacheManager::write(uint64_t addr) {
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
 
+    /*
     extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
     extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
+    */
+
+    // Correct L1/L2 set and tag calculation
+    set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
+    tag1 = addr >> this->l1.set_num_bits();
+
+    set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
+    tag2 = addr >> this->l2.set_num_bits();
 
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
