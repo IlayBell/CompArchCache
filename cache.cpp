@@ -111,47 +111,45 @@ void Block::fill(uint64_t tag, uint64_t addr_aligned) {
 
 void CacheManager::read(uint64_t addr) {
     addr >>= log2(this->block_size);
+    /*
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
 
-    /*
+    
     extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
     extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
     */
    // Correct L1/L2 set and tag calculation
-    set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
-    tag1 = addr >> this->l1.set_num_bits();
+    uint64_t set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
+    uint64_t tag1 = addr >> this->l1.set_num_bits();
 
-    set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
-    tag2 = addr >> this->l2.set_num_bits();
-
+    uint64_t set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
+    uint64_t tag2 = addr >> this->l2.set_num_bits(); // <- this must use l2.set_num_bits()
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
         this->l1.update_LRU(set1, tag1);
-        
     } else {
         this->l1.add_miss();
+
         this->l2.add_access();
-
         if (this->l2.is_exist_in_set(set2, tag2)) {
-            // L2 hit → propagate block to L1
-            Block* l2_block = this->l2.get_block_in_set(set2, tag2);
-            this->l1.propogate_block(set1, tag1, addr, this);
-
-            // Copy dirty bit from L2
-            Block* l1_block = this->l1.get_block_in_set(set1, tag1);
-            if (l1_block && l2_block) {
-                l1_block->set_dirty(l2_block->get_dirty());
-            }
-
             this->l2.update_LRU(set2, tag2);
         } else {
-            // L2 miss → fill L2 and L1 (dirty=false)
             this->l2.add_miss();
+
             this->l2.propogate_block(set2, tag2, addr, this);
-            this->l1.propogate_block(set1, tag1, addr, this);
+        }
+
+        this->l1.propogate_block(set1, tag1, addr, this);
+        
+        Block* new_l1_block = this->l1.get_block_in_set(set1, tag1);
+        Block* new_l2_block = this->l2.get_block_in_set(set2, tag2);
+        if (new_l1_block && new_l2_block) {
+            new_l1_block->set_dirty(new_l2_block->get_dirty());
+        } else {
+            std::cout << "hamatzav bakantim!!" << std::endl;
         }
     }
 
