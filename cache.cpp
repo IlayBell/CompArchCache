@@ -125,8 +125,7 @@ void CacheManager::read(uint64_t addr) {
         this->l1.add_miss();
 
         this->l2.add_access();
-        Block* l2_block = this->l2.get_block_in_set(set2, tag2);
-        if (l2_block) {
+        if (this->l2.is_exist_in_set(set2, tag2)) {
             this->l2.update_LRU(set2, tag2);
         } else {
             this->l2.add_miss();
@@ -186,7 +185,7 @@ void L1::evac_block(Block& block, CacheManager* cache_manager) {
 
     if (l2_block) {
         l2_block->set_dirty(block.get_dirty());
-    }
+    } 
 
     block.set_valid(false);
 }
@@ -308,8 +307,7 @@ void CacheManager::write(uint64_t addr) {
         this->l1.add_miss();
 
         this->l2.add_access();
-        Block* l2_block = this->l2.get_block_in_set(set2, tag2);
-        if (l2_block) {
+        if (this->l2.is_exist_in_set(set2, tag2)) {
             if(this->is_write_allocate) {
                 this->l1.propogate_block(set1, tag1, addr, this);
                 this->l1.write_data(set1, tag1);
