@@ -1,6 +1,7 @@
 #include "cache.h"
 #include <iostream>
 
+// Power with base2 helper functions
 int pow2(int exp) {
     return 1 << exp;
 }
