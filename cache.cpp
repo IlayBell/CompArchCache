@@ -16,7 +16,7 @@ int log2(int x) {
     return res;
 }
 
-// c'tor for ChaseManager
+// c'tor for CacheManager
 CacheManager::CacheManager(int mem_cycle, 
                            int block_size_log,
                            bool is_write_allocate,
@@ -43,7 +43,7 @@ CacheManager::CacheManager(int mem_cycle,
     
 }
 
-// c'tor for ChaseLevel, used for demoing L1 and L2. Compused of Sets
+// c'tor for CacheLevel, used for demo L1 and L2. Composed of Sets
 CacheLevel::CacheLevel(int cache_size, int block_size, int ways_num, int access_time) :
         sets((cache_size / block_size) / ways_num, Set(ways_num, 0)) {
 
