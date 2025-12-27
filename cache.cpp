@@ -6,6 +6,7 @@ int pow2(int exp) {
     return 1 << exp;
 }
 
+// Logarithm with base2 helper function
 int log2(int x) {
     int res = 0;
     while (x >>= 1) {
@@ -15,7 +16,7 @@ int log2(int x) {
     return res;
 }
 
-
+// c'tor for ChaseManager
 CacheManager::CacheManager(int mem_cycle, 
                            int block_size_log,
                            bool is_write_allocate,
@@ -42,6 +43,7 @@ CacheManager::CacheManager(int mem_cycle,
     
 }
 
+// c'tor for ChaseLevel, used for demoing L1 and L2. Compused of Sets
 CacheLevel::CacheLevel(int cache_size, int block_size, int ways_num, int access_time) :
         sets((cache_size / block_size) / ways_num, Set(ways_num, 0)) {
 
@@ -60,12 +62,13 @@ CacheLevel::CacheLevel(int cache_size, int block_size, int ways_num, int access_
 }
 
 
-
+// c'tor for Set. Composed of Blocks.
 Set::Set(int ways_num, int set_num) : ways(ways_num) {
     this->ways_num = ways_num;
     this->set_num = set_num;
 }
 
+// c'tor for Block.
 Block::Block() {
     this->valid = false;
     this->dirty = false;
@@ -90,18 +93,22 @@ void Block::set_dirty(bool dirty) {
     this->dirty = dirty;
 }
 
+// check if tag of block equals input tag
 bool Block::compare_tag(uint64_t other) {
     return this->tag == other;
 }
 
+// return addr without block offset bits
 uint64_t Block::get_addr_aligned() {
     return this->addr_aligned;
 }
 
+// set addr without block offset bits
 void Block::set_addr_aligned(uint64_t addr_aligned) {
     this->addr_aligned = addr_aligned;
 }
 
+// fill block with tag and set valid to true, dirty to false, LRU to 0
 void Block::fill(uint64_t tag, uint64_t addr_aligned) {
     this->tag = tag;
     this->valid = true;
@@ -110,6 +117,7 @@ void Block::fill(uint64_t tag, uint64_t addr_aligned) {
     this->addr_aligned = addr_aligned;
 }
 
+// Read operation in CacheManager
 void CacheManager::read(uint64_t addr) {
     addr >>= log2(this->block_size);
     
@@ -118,15 +126,15 @@ void CacheManager::read(uint64_t addr) {
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
 
-    
+    // get sets and tags for L1 and L2 from addr
     extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
     extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
-   
+    
+    // reading from L1 and L2 according to cache characteristics
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
         this->l1.update_LRU(set1, tag1);
         
-        // ✅ FIX: inclusive cache → L2 was also accessed
         if (this->l2.is_exist_in_set(set2, tag2)) {
             this->l2.update_LRU(set2, tag2);
         }
@@ -145,6 +153,7 @@ void CacheManager::read(uint64_t addr) {
 
         this->l1.propogate_block(set1, tag1, addr, this);
         
+        // set dirty if needed
         Block* new_l1_block = this->l1.get_block_in_set(set1, tag1);
         Block* new_l2_block = this->l2.get_block_in_set(set2, tag2);
         if (new_l1_block && new_l2_block) {
@@ -156,6 +165,7 @@ void CacheManager::read(uint64_t addr) {
 
 }
 
+// brings a block to cache level on miss
 void CacheLevel::propogate_block(uint64_t set,
                              uint64_t tag,
                              uint64_t addr_aligned,
@@ -172,6 +182,7 @@ void CacheLevel::propogate_block(uint64_t set,
     this->update_LRU(set, tag);
 }
 
+// releases the LRU block in the set, evicting it from the cache level
 Block* Set::release(CacheLevel* cache, CacheManager* cache_manager) {
     Block& lru_block = this->get_LRU_block();
     cache->evac_block(lru_block, cache_manager);
@@ -179,6 +190,7 @@ Block* Set::release(CacheLevel* cache, CacheManager* cache_manager) {
     return &lru_block;
 }
 
+// return the LRU block in the set
 Block& Set::get_LRU_block() {
     Block* max_block = &this->ways.at(0);
 
@@ -193,31 +205,38 @@ Block& Set::get_LRU_block() {
     return *max_block;
 }
 
+// evict block from L1 to L2
 void L1::evac_block(Block& block, CacheManager* cache_manager) {
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
 
-    extract_bits(block.get_addr_aligned(), cache_manager->l2.set_num_bits(), set2, tag2);
+    extract_bits(block.get_addr_aligned(),
+                 cache_manager->l2.set_num_bits(),
+                 set2,
+                 tag2);
 
     Block* l2_block = cache_manager->l2.get_block_in_set(set2, tag2);
 
     if (l2_block) {
         l2_block->set_dirty(block.get_dirty());
         
-        // ✅ FIX: eviction implies recent use
         cache_manager->l2.update_LRU(set2, tag2);
     } 
 
     block.set_valid(false);
 }
 
+// evict block from L2 (no lower level, so just invalidate in L1 if exists)
 void L2::evac_block(Block& block, CacheManager* cache_manager) {
     block.set_valid(false);
 
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
 
-    extract_bits(block.get_addr_aligned(), cache_manager->l1.set_num_bits(), set1, tag1);
+    extract_bits(block.get_addr_aligned(),
+                 cache_manager->l1.set_num_bits(),
+                 set1,
+                 tag1);
 
     Block* l1_block = cache_manager->l1.get_block_in_set(set1, tag1);
 
@@ -252,6 +271,7 @@ uint64_t Block::get_tag() {
     return this->tag;
 }
 
+// return an available block in the set (invalid), or nullptr if none exist
 Block* Set::get_available_block() {
     for (int i = 0; i < this->ways_num; i++) {
         Block* curr_block = &this->ways.at(i);
@@ -271,6 +291,8 @@ void CacheLevel::add_miss() {
     this->miss++;
 }
 
+// update LRU orders in set after access. Accessed block set to 0, others 
+// incremented by 1
 void CacheLevel::update_LRU(uint64_t set, uint64_t tag) {
     Set& curr_set = this->sets.at(set);
     for (int i = 0; i < this->ways_num; i++) {
@@ -309,17 +331,13 @@ bool CacheLevel::is_exist_in_set(uint64_t set, uint64_t tag) {
     return false;
 }
 
+// Write operation in CacheManager
 void CacheManager::write(uint64_t addr) {
     addr >>= log2(this->block_size);
     uint64_t set1 = 0;
     uint64_t tag1 = 0;
     uint64_t set2 = 0;
     uint64_t tag2 = 0;
-
-    /*
-    extract_bits(addr, this->l1.set_num_bits(), set1, tag1);
-    extract_bits(addr, this->l2.set_num_bits(), set2, tag2);
-    */
 
     // Correct L1/L2 set and tag calculation
     set1 = addr & ((1ULL << this->l1.set_num_bits()) - 1);
@@ -328,6 +346,7 @@ void CacheManager::write(uint64_t addr) {
     set2 = addr & ((1ULL << this->l2.set_num_bits()) - 1);
     tag2 = addr >> this->l2.set_num_bits();
 
+    // writing to L1 and L2 according to cache characteristics
     this->l1.add_access();
     if (this->l1.is_exist_in_set(set1, tag1)) {
         this->l1.write_data(set1, tag1);
@@ -377,15 +396,18 @@ int CacheLevel::set_num_bits() {
     return log2(this->sets_num);
 }
 
+// helper function to extract lsb_size bits from num into lsb, rest into msb
 void extract_bits(uint64_t num, int lsb_size, uint64_t& lsb, uint64_t& msb) {
     uint64_t msb_mask = -1 << lsb_size;
     lsb = num & (~msb_mask);
     msb = (num & msb_mask) >> lsb_size;
 }
 
+// c'tors for L1
 L1::L1(int cache_size, int block_size, int ways_num, int access_time)
     : CacheLevel(cache_size, block_size, ways_num, access_time) {};
 
+// c'tors for L2
 L2::L2(int cache_size, int block_size, int ways_num, int access_time)
     : CacheLevel(cache_size, block_size, ways_num, access_time) {};
 
@@ -405,7 +427,9 @@ int CacheLevel::get_access_time() {
     return this->access_time;
 }
 
-void CacheManager::calc_stats(double& L1_miss_rate, double& L2_miss_rate, double& avg_acc_time) {
+void CacheManager::calc_stats(double& L1_miss_rate,
+                              double& L2_miss_rate,
+                              double& avg_acc_time) {
     L1_miss_rate = this->l1.calc_miss_rate();
     L2_miss_rate = this->l2.calc_miss_rate();
 
